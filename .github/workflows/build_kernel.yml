@@ -1,4 +1,4 @@
-name: Build ARM64 Kernel
+name: Build Kernel
 
 on:
   push:
@@ -12,8 +12,8 @@ jobs:
     env:
       ARCH: arm64
       SUBARCH: arm64
-      CROSS_COMPILE: ${{ github.workspace }}/toolchain/aarch64-linux-android-4.9-toolchain/bin/aarch64-linux-android-
       OUTPUT_DIR: ${{ github.workspace }}/out
+      CROSS_COMPILE: ${{ github.workspace }}/toolchain/aarch64-linux-android-4.9-toolchain/bin/aarch64-linux-android-
 
     steps:
     - name: Checkout source
@@ -27,18 +27,22 @@ jobs:
     - name: Create output directory
       run: mkdir -p $OUTPUT_DIR
 
-    - name: Build   
+    - name: Generate kernel config
       run: |
-        make -j$(nproc) -C ${{ github.workspace }} O=$OUTPUT_DIR \
-          DTC_EXT=${{ github.workspace }}/tools/dtc CONFIG_BUILD_ARM64_DT_OVERLAY=y \
-          ARCH=arm64 CROSS_COMPILE=$CROSS_COMPILE \
+        make -C ${{ github.workspace }} O=$OUTPUT_DIR \
+          ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
           vendor/r9q_eur_openx2_defconfig
+
+    - name: Build kernel
+      run: |
+        DTC_EXT=${{ github.workspace }}/tools/dtc
         make -j$(nproc) -C ${{ github.workspace }} O=$OUTPUT_DIR \
-          DTC_EXT=${{ github.workspace }}/tools/dtc CONFIG_BUILD_ARM64_DT_OVERLAY=y \
-          ARCH=arm64 CROSS_COMPILE=$CROSS_COMPILE
+          ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
+          DTC_EXT=$DTC_EXT CONFIG_BUILD_ARM64_DT_OVERLAY=y
 
     - name: Upload kernel Image artifact
       uses: actions/upload-artifact@v3
       with:
         name: kernel-image
         path: ${{ env.OUTPUT_DIR }}/arch/arm64/boot/Image
+
