@@ -1,4 +1,4 @@
-name: Build Kernel
+name: Build Kernel with Clang
 
 on:
   push:
@@ -13,8 +13,9 @@ jobs:
       ARCH: arm64
       SUBARCH: arm64
       OUTPUT_DIR: ${{ github.workspace }}/out
-      TOOLCHAIN_DIR: ${{ github.workspace }}/toolchain/aarch64-linux-android-4.9-toolchain/bin
-      CROSS_COMPILE: ${{ github.workspace }}/toolchain/aarch64-linux-android-4.9-toolchain/bin/aarch64-linux-android-
+      CLANG_DIR: ${{ github.workspace }}/toolchain/llvm-toolchain
+      CLANG_BIN: ${{ github.workspace }}/toolchain/llvm-toolchain/bin
+      CROSS_COMPILE: aarch64-linux-gnu-
 
     steps:
     - name: Checkout source
@@ -25,20 +26,15 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           build-essential bc bison flex git curl zip unzip cpio python3 python3-pip \
-          libncurses5-dev libssl-dev wget libelf-dev fakeroot
+          libncurses5-dev libssl-dev wget libelf-dev fakeroot gcc-aarch64-linux-gnu
 
-    - name: Clone Android 4.9 toolchain
+    - name: Download LLVM Clang toolchain
       run: |
-        git clone https://github.com/Adrilaw/aarch64-linux-android-4.9-toolchain.git toolchain/aarch64-linux-android-4.9-toolchain
-
-    - name: Ensure linker symlink
-      run: |
-        TOOLCHAIN_DIR=${{ github.workspace }}/toolchain/aarch64-linux-android-4.9-toolchain/bin
-        if [ -f "$TOOLCHAIN_DIR/aarch64-linux-android-ld" ] && [ ! -e "$TOOLCHAIN_DIR/aarch64-linux-android-ld.bfd" ]; then
-          ln -sf "$TOOLCHAIN_DIR/aarch64-linux-android-ld" "$TOOLCHAIN_DIR/aarch64-linux-android-ld.bfd"
-        else
-          echo "Linker symlink already exists or source missing"
-        fi
+        mkdir -p toolchain
+        cd toolchain
+        wget https://releases.llvm.org/10.0.0/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+        tar -xf clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz
+        mv clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-16.04 llvm-toolchain
 
     - name: Create output directory
       run: mkdir -p $OUTPUT_DIR
@@ -47,13 +43,15 @@ jobs:
       run: |
         make -C ${{ github.workspace }} O=$OUTPUT_DIR \
           ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
+          CC=${CLANG_BIN}/clang \
           vendor/r9q_eur_openx2_defconfig
 
-    - name: Build kernel with verbose logging
+    - name: Build kernel with Clang and verbose logging
       run: |
         DTC_EXT=${{ github.workspace }}/tools/dtc
         make -j$(nproc) V=1 -C ${{ github.workspace }} O=$OUTPUT_DIR \
           ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
+          CC=${CLANG_BIN}/clang \
           DTC_EXT=$DTC_EXT CONFIG_BUILD_ARM64_DT_OVERLAY=y 2>&1 | tee $OUTPUT_DIR/build.log
 
     - name: Upload kernel Image artifact
