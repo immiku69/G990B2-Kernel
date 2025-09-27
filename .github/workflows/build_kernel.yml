@@ -1,4 +1,4 @@
-name: Build Kernel with Android Clang
+name: Build Kernel with Clang
 
 on:
   push:
@@ -13,9 +13,9 @@ jobs:
       ARCH: arm64
       SUBARCH: arm64
       OUTPUT_DIR: ${{ github.workspace }}/out
-      CLANG_DIR: ${{ github.workspace }}/toolchain/clang-r498928
-      CLANG_BIN: ${{ github.workspace }}/toolchain/clang-r498928/bin
-      CROSS_COMPILE: aarch64-linux-android-
+      CLANG_DIR: ${{ github.workspace }}/toolchain/llvm-toolchain
+      CLANG_BIN: ${{ github.workspace }}/toolchain/llvm-toolchain/bin
+      CROSS_COMPILE: aarch64-linux-gnu-
 
     steps:
     - name: Checkout source
@@ -26,14 +26,15 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           build-essential bc bison flex git curl zip unzip cpio python3 python3-pip \
-          libncurses5-dev libssl-dev wget libelf-dev fakeroot
+          libncurses5-dev libssl-dev wget libelf-dev fakeroot gcc-aarch64-linux-gnu
 
-    - name: Download Android Clang toolchain
+    - name: Download Clang toolchain
       run: |
         mkdir -p toolchain
         cd toolchain
-        wget https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/master/clang-r498928.tar.gz
-        tar -xzf clang-r498928.tar.gz
+        curl -LO https://github.com/ClangBuiltLinux/tc-build/releases/download/2024.05.17/clang+llvm-18.1.4-x86_64-linux-gnu.tar.xz
+        tar -xf clang+llvm-18.1.4-x86_64-linux-gnu.tar.xz
+        mv clang+llvm-18.1.4-x86_64-linux-gnu llvm-toolchain
 
     - name: Create output directory
       run: mkdir -p $OUTPUT_DIR
