@@ -49,16 +49,23 @@ jobs:
           ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
           vendor/r9q_eur_openx2_defconfig
 
-    - name: Build kernel
+    - name: Build kernel with verbose logging
       run: |
         DTC_EXT=${{ github.workspace }}/tools/dtc
-        make -j$(nproc) -C ${{ github.workspace }} O=$OUTPUT_DIR \
+        make -j$(nproc) V=1 -C ${{ github.workspace }} O=$OUTPUT_DIR \
           ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE \
-          DTC_EXT=$DTC_EXT CONFIG_BUILD_ARM64_DT_OVERLAY=y
+          DTC_EXT=$DTC_EXT CONFIG_BUILD_ARM64_DT_OVERLAY=y 2>&1 | tee $OUTPUT_DIR/build.log
 
     - name: Upload kernel Image artifact
       uses: actions/upload-artifact@v4
       with:
         name: kernel-image
         path: ${{ env.OUTPUT_DIR }}/arch/arm64/boot/Image
+
+    - name: Upload build log on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: ${{ env.OUTPUT_DIR }}/build.log
 
