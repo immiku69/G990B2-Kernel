@@ -1,4 +1,4 @@
-name: Build ARM64 Kernel
+name: Build Kernel
 
 on:
   push:
@@ -27,8 +27,6 @@ jobs:
           build-essential bc bison flex git curl zip unzip cpio python3 python3-pip \
           libncurses5-dev libssl-dev wget libelf-dev fakeroot
 
-    - name: Make toolchain binaries executable
-      run: chmod +x $TOOLCHAIN_DIR/*
 
     - name: Ensure linker symlink
       run: |
