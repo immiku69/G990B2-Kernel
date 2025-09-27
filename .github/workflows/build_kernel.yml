@@ -29,7 +29,7 @@ jobs:
 
     - name: Clone Android 4.9 toolchain
       run: |
-        git clone https://github.com/Adrilaw/aarch64-linux-android-4.9- toolchain/aarch64-linux-android-4.9-toolchain
+        git clone https://github.com/Adrilaw/aarch64-linux-android-4.9-toolchain.git toolchain/aarch64-linux-android-4.9-toolchain
 
     - name: Ensure linker symlink
       run: |
