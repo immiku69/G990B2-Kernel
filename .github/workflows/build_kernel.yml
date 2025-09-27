@@ -34,8 +34,10 @@ jobs:
     - name: Ensure linker symlink
       run: |
         TOOLCHAIN_DIR=${{ github.workspace }}/toolchain/aarch64-linux-android-4.9-toolchain/bin
-        if [ -f "$TOOLCHAIN_DIR/aarch64-linux-android-ld" ]; then
+        if [ -f "$TOOLCHAIN_DIR/aarch64-linux-android-ld" ] && [ ! -e "$TOOLCHAIN_DIR/aarch64-linux-android-ld.bfd" ]; then
           ln -sf "$TOOLCHAIN_DIR/aarch64-linux-android-ld" "$TOOLCHAIN_DIR/aarch64-linux-android-ld.bfd"
+        else
+          echo "Linker symlink already exists or source missing"
         fi
 
     - name: Create output directory
