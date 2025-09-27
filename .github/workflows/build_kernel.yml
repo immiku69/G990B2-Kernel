@@ -27,9 +27,13 @@ jobs:
           build-essential bc bison flex git curl zip unzip cpio python3 python3-pip \
           libncurses5-dev libssl-dev wget libelf-dev fakeroot
 
+    - name: Clone Android 4.9 toolchain
+      run: |
+        git clone https://github.com/Adrilaw/aarch64-linux-android-4.9- toolchain/aarch64-linux-android-4.9-toolchain
 
     - name: Ensure linker symlink
       run: |
+        TOOLCHAIN_DIR=${{ github.workspace }}/toolchain/aarch64-linux-android-4.9-toolchain/bin
         if [ -f "$TOOLCHAIN_DIR/aarch64-linux-android-ld" ]; then
           ln -sf "$TOOLCHAIN_DIR/aarch64-linux-android-ld" "$TOOLCHAIN_DIR/aarch64-linux-android-ld.bfd"
         fi
