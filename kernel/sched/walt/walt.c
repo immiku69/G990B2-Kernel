@@ -13,11 +13,11 @@
 #include <trace/events/sched.h>
 
 const char *task_event_names[] = {"PUT_PREV_TASK", "PICK_NEXT_TASK",
-				  "TASK_WAKE", "TASK_MIGRATE", "TASK_UPDATE",
-				"IRQ_UPDATE"};
+                  "TASK_WAKE", "TASK_MIGRATE", "TASK_UPDATE",
+                  "IRQ_UPDATE"};
 
 const char *migrate_type_names[] = {"GROUP_TO_RQ", "RQ_TO_GROUP",
-					 "RQ_TO_RQ", "GROUP_TO_GROUP"};
+                    "RQ_TO_RQ", "GROUP_TO_GROUP"};
 
 #define SCHED_FREQ_ACCOUNT_WAIT_TIME 0
 #define SCHED_ACCOUNT_WAIT_TIME 1
@@ -25,17 +25,17 @@ const char *migrate_type_names[] = {"GROUP_TO_RQ", "RQ_TO_GROUP",
 #define EARLY_DETECTION_DURATION 9500000
 #define MAX_NUM_CGROUP_COLOC_ID 20
 
-#define WINDOW_STATS_RECENT		0
-#define WINDOW_STATS_MAX		1
-#define WINDOW_STATS_MAX_RECENT_AVG	2
-#define WINDOW_STATS_AVG		3
-#define WINDOW_STATS_INVALID_POLICY	4
+#define WINDOW_STATS_RECENT     0
+#define WINDOW_STATS_MAX        1
+#define WINDOW_STATS_MAX_RECENT_AVG 2
+#define WINDOW_STATS_AVG        3
+#define WINDOW_STATS_INVALID_POLICY 4
 
-#define MAX_NR_CLUSTERS			3
+#define MAX_NR_CLUSTERS         3
 
-#define FREQ_REPORT_MAX_CPU_LOAD_TOP_TASK	0
-#define FREQ_REPORT_CPU_LOAD			1
-#define FREQ_REPORT_TOP_TASK			2
+#define FREQ_REPORT_MAX_CPU_LOAD_TOP_TASK   0
+#define FREQ_REPORT_CPU_LOAD            1
+#define FREQ_REPORT_TOP_TASK            2
 
 #define NEW_TASK_ACTIVE_TIME 100000000
 
@@ -52,65 +52,65 @@ static struct irq_work walt_migration_irq_work;
 
 u64 sched_ktime_clock(void)
 {
-	if (unlikely(sched_ktime_suspended))
-		return ktime_to_ns(ktime_last);
-	return ktime_get_ns();
+    if (unlikely(sched_ktime_suspended))
+        return ktime_to_ns(ktime_last);
+    return ktime_get_ns();
 }
 
 static void sched_resume(void)
 {
-	sched_ktime_suspended = false;
+    sched_ktime_suspended = false;
 }
 
 static int sched_suspend(void)
 {
-	ktime_last = ktime_get();
-	sched_ktime_suspended = true;
-	return 0;
+    ktime_last = ktime_get();
+    sched_ktime_suspended = true;
+    return 0;
 }
 
 static struct syscore_ops sched_syscore_ops = {
-	.resume = sched_resume,
-	.suspend = sched_suspend
+    .resume = sched_resume,
+    .suspend = sched_suspend
 };
 
 static int __init sched_init_ops(void)
 {
-	register_syscore_ops(&sched_syscore_ops);
-	return 0;
+    register_syscore_ops(&sched_syscore_ops);
+    return 0;
 }
 late_initcall(sched_init_ops);
 
 static void acquire_rq_locks_irqsave(const cpumask_t *cpus,
-				     unsigned long *flags)
+                     unsigned long *flags)
 {
-	int cpu;
-	int level = 0;
+    int cpu;
+    int level = 0;
 
-	local_irq_save(*flags);
-	for_each_cpu(cpu, cpus) {
-		if (level == 0)
-			raw_spin_lock(&cpu_rq(cpu)->lock);
-		else
-			raw_spin_lock_nested(&cpu_rq(cpu)->lock, level);
-		level++;
-	}
+    local_irq_save(*flags);
+    for_each_cpu(cpu, cpus) {
+        if (level == 0)
+            raw_spin_lock(&cpu_rq(cpu)->lock);
+        else
+            raw_spin_lock_nested(&cpu_rq(cpu)->lock, level);
+        level++;
+    }
 }
 
 static void release_rq_locks_irqrestore(const cpumask_t *cpus,
-					unsigned long *flags)
+                    unsigned long *flags)
 {
-	int cpu;
+    int cpu;
 
-	for_each_cpu(cpu, cpus)
-		raw_spin_unlock(&cpu_rq(cpu)->lock);
-	local_irq_restore(*flags);
+    for_each_cpu(cpu, cpus)
+        raw_spin_unlock(&cpu_rq(cpu)->lock);
+    local_irq_restore(*flags);
 }
 
 unsigned int sysctl_sched_capacity_margin_up[MAX_MARGIN_LEVELS] = {
-			[0 ... MAX_MARGIN_LEVELS-1] = 1078}; /* ~5% margin */
+    [0 ... MAX_MARGIN_LEVELS-1] = 1078}; /* ~5% margin */
 unsigned int sysctl_sched_capacity_margin_down[MAX_MARGIN_LEVELS] = {
-			[0 ... MAX_MARGIN_LEVELS-1] = 1205}; /* ~15% margin */
+    [0 ... MAX_MARGIN_LEVELS-1] = 1205}; /* ~15% margin */
 
 unsigned int sysctl_walt_cpu_high_irqload = 95;
 static unsigned int walt_cpu_high_irqload;
@@ -127,7 +127,7 @@ __read_mostly unsigned int sched_ravg_hist_size = 5;
 static __read_mostly unsigned int sched_io_is_busy = 1;
 
 __read_mostly unsigned int sysctl_sched_window_stats_policy =
-	WINDOW_STATS_MAX_RECENT_AVG;
+    WINDOW_STATS_MAX_RECENT_AVG;
 
 unsigned int sysctl_sched_ravg_window_nr_ticks = (HZ / NR_WINDOWS_PER_SEC);
 
@@ -152,54 +152,41 @@ unsigned int __read_mostly sched_init_task_load_windows_scaled;
 unsigned int __read_mostly sysctl_sched_init_task_load_pct = 15;
 
 unsigned int max_possible_capacity = 1024; /* max(rq->max_possible_capacity) */
-unsigned int
-min_max_possible_capacity = 1024; /* min(rq->max_possible_capacity) */
+unsigned int min_max_possible_capacity = 1024; /* min(rq->max_possible_capacity) */
 
-/*
- * Task load is categorized into buckets for the purpose of top task tracking.
- * The entire range of load from 0 to sched_ravg_window needs to be covered
- * in NUM_LOAD_INDICES number of buckets. Therefore the size of each bucket
- * is given by sched_ravg_window / NUM_LOAD_INDICES. Since the default value
- * of sched_ravg_window is DEFAULT_SCHED_RAVG_WINDOW, use that to compute
- * sched_load_granule.
- */
 __read_mostly unsigned int sched_load_granule =
-			DEFAULT_SCHED_RAVG_WINDOW / NUM_LOAD_INDICES;
-/* Size of bitmaps maintained to track top tasks */
-static const unsigned int top_tasks_bitmap_size =
-		BITS_TO_LONGS(NUM_LOAD_INDICES + 1) * sizeof(unsigned long);
+    DEFAULT_SCHED_RAVG_WINDOW / NUM_LOAD_INDICES;
 
-/*
- * This governs what load needs to be used when reporting CPU busy time
- * to the cpufreq governor.
- */
+static const unsigned int top_tasks_bitmap_size =
+    BITS_TO_LONGS(NUM_LOAD_INDICES + 1) * sizeof(unsigned long);
+
 __read_mostly unsigned int sysctl_sched_freq_reporting_policy;
 
 static int __init set_sched_ravg_window(char *str)
 {
-	unsigned int window_size;
+    unsigned int window_size;
 
-	get_option(&str, &window_size);
+    get_option(&str, &window_size);
 
-	if (window_size < DEFAULT_SCHED_RAVG_WINDOW ||
-			window_size > MAX_SCHED_RAVG_WINDOW) {
-		WARN_ON(1);
-		return -EINVAL;
-	}
+    if (window_size < DEFAULT_SCHED_RAVG_WINDOW ||
+        window_size > MAX_SCHED_RAVG_WINDOW) {
+        WARN_ON(1);
+        return -EINVAL;
+    }
 
-	sched_ravg_window = window_size;
-	return 0;
+    sched_ravg_window = window_size;
+    return 0;
 }
 
 early_param("sched_ravg_window", set_sched_ravg_window);
 
 static int __init set_sched_predl(char *str)
 {
-	unsigned int predl;
+    unsigned int predl;
 
-	get_option(&str, &predl);
-	sched_predl = !!predl;
-	return 0;
+    get_option(&str, &predl);
+    sched_predl = !!predl;
+    return 0;
 }
 early_param("sched_predl", set_sched_predl);
 
@@ -211,33 +198,33 @@ __read_mostly unsigned int walt_scale_demand_divisor;
 
 static inline void walt_task_dump(struct task_struct *p)
 {
-	char buff[NR_CPUS * 16];
-	int i, j = 0;
-	int buffsz = NR_CPUS * 16;
+    char buff[NR_CPUS * 16];
+    int i, j = 0;
+    int buffsz = NR_CPUS * 16;
 
-	SCHED_PRINT(p->pid);
-	SCHED_PRINT(p->wts.mark_start);
-	SCHED_PRINT(p->wts.demand);
-	SCHED_PRINT(p->wts.coloc_demand);
-	SCHED_PRINT(sched_ravg_window);
-	SCHED_PRINT(new_sched_ravg_window);
+    printk_deferred("p->pid=%d\n", p->pid);  // ✅ Fixed format for pid_t
+    SCHED_PRINT(p->wts.mark_start);
+    SCHED_PRINT(p->wts.demand);
+    SCHED_PRINT(p->wts.coloc_demand);
+    SCHED_PRINT(sched_ravg_window);
+    SCHED_PRINT(new_sched_ravg_window);
 
-	for (i = 0 ; i < nr_cpu_ids; i++)
-		j += scnprintf(buff + j, buffsz - j, "%u ",
-				p->wts.curr_window_cpu[i]);
-	printk_deferred("%s=%d (%s)\n", STRG(p->wts.curr_window),
-			p->wts.curr_window, buff);
+    for (i = 0 ; i < nr_cpu_ids; i++)
+        j += scnprintf(buff + j, buffsz - j, "%u ",
+                p->wts.curr_window_cpu[i]);
+    printk_deferred("%s=%d (%s)\n", STRG(p->wts.curr_window),
+            p->wts.curr_window, buff);
 
-	for (i = 0, j = 0 ; i < nr_cpu_ids; i++)
-		j += scnprintf(buff + j, buffsz - j, "%u ",
-				p->wts.prev_window_cpu[i]);
-	printk_deferred("%s=%d (%s)\n", STRG(p->wts.prev_window),
-			p->wts.prev_window, buff);
+    for (i = 0, j = 0 ; i < nr_cpu_ids; i++)
+        j += scnprintf(buff + j, buffsz - j, "%u ",
+                p->wts.prev_window_cpu[i]);
+    printk_deferred("%s=%d (%s)\n", STRG(p->wts.prev_window),
+            p->wts.prev_window, buff);
 
-	SCHED_PRINT(p->wts.last_wake_ts);
-	SCHED_PRINT(p->wts.last_enqueued_ts);
-	SCHED_PRINT(p->wts.misfit);
-	SCHED_PRINT(p->wts.unfilter);
+    SCHED_PRINT(p->wts.last_wake_ts);
+    SCHED_PRINT(p->wts.last_enqueued_ts);
+    SCHED_PRINT(p->wts.misfit);
+    SCHED_PRINT(p->wts.unfilter);
 }
 
 static inline void walt_rq_dump(int cpu)
