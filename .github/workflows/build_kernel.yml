@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,8 +14,8 @@ jobs:
       ARCH: arm64
       SUBARCH: arm64
       OUTPUT_DIR: ${{ github.workspace }}/out
-      CLANG_DIR: ${{ github.workspace }}/toolchain/llvm-toolchain
-      CLANG_BIN: ${{ github.workspace }}/toolchain/llvm-toolchain/bin
+      CLANG_DIR: ${{ github.workspace }}/toolchains/neutron-clang
+      CLANG_BIN: ${{ github.workspace }}/toolchains/neutron-clang/bin
       CROSS_COMPILE: aarch64-linux-gnu-
 
     steps:
@@ -25,8 +26,12 @@ jobs:
       run: |
         sudo apt-get update
         export SRC_DIR=$(pwd)
-        mkdir -p "$(pwd)/toolchains/neutron-clang"; cd "$(pwd)/toolchains/neutron-clang"; curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"; chmod +x antman; ./antman -S
-        cd $SRC_DIR
+        mkdir -p "$CLANG_DIR"
+        cd "$CLANG_DIR"
+        curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
+        chmod +x antman
+        ./antman -S
+        cd "$SRC_DIR"
         sudo apt-get install -y \
           build-essential bc bison flex git curl zip unzip cpio python3 python3-pip \
           libncurses5-dev libssl-dev wget libelf-dev fakeroot gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
@@ -36,33 +41,25 @@ jobs:
 
     - name: Generate kernel config
       run: |
-        export PATH=${CLANG_BIN}:$PATH
+        export PATH=$CLANG_BIN:$PATH
         make -C ${{ github.workspace }} O=$OUTPUT_DIR \
-        ARCH=$ARCH \
-        CROSS_COMPILE=aarch64-linux-gnu- \
-        CC=clang \
-        vendor/r9q_eur_openx2_defconfig
-
+          ARCH=$ARCH \
+          CROSS_COMPILE=$CROSS_COMPILE \
+          CC=clang \
+          vendor/r9q_eur_openx2_defconfig
 
     - name: Build kernel
       run: |
-        export PATH=$(pwd)/toolchain/neutron-clang/bin:$PATH
+        export PATH=$CLANG_BIN:$PATH
         export CC=clang
         export CLANG_TRIPLE=aarch64-linux-gnu-
-        export CROSS_COMPILE=aarch64-linux-gnu-
+        export CROSS_COMPILE=$CROSS_COMPILE
         KERNEL_MAKE_ENV="DTC_EXT=$(pwd)/tools/dtc CONFIG_BUILD_ARM64_DT_OVERLAY=y"
-        make -j64 -C $(pwd) O=$(pwd)/out $KERNEL_MAKE_ENV ARCH=arm64 CROSS_COMPILE=$CROSS_COMPILE
+        make -j$(nproc) -C $(pwd) O=$OUTPUT_DIR $KERNEL_MAKE_ENV ARCH=$ARCH CROSS_COMPILE=$CROSS_COMPILE
 
     - name: Upload kernel Image artifact
       uses: actions/upload-artifact@v4
       with:
         name: kernel-image
         path: ${{ env.OUTPUT_DIR }}/arch/arm64/boot/Image
-
-    - name: Upload build log on failure
-      if: failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-log
-        path: ${{ env.OUTPUT_DIR }}/build.log
 
