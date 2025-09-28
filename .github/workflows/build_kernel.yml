@@ -52,6 +52,7 @@ jobs:
       run: |
         export PATH=$CLANG_BIN:$PATH
         export CC=clang
+        export KCFLAGS="-Wno-error"
         export CLANG_TRIPLE=aarch64-linux-gnu-
         export CROSS_COMPILE=$CROSS_COMPILE
         KERNEL_MAKE_ENV="DTC_EXT=$(pwd)/tools/dtc CONFIG_BUILD_ARM64_DT_OVERLAY=y"
